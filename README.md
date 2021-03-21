@@ -17,7 +17,9 @@ pandas
 ### Use
 
 `initialize_photons.py` takes in an image / object and converts it into a numpy array for processing
+
 `initialize_lens.py` sets up the point mass(es) that will act as gravitational lens
+
 `gen_relativity.py` contains modules we can call, with set values for G, c and conversion between different coordinate systems
 
 ## Licensing
