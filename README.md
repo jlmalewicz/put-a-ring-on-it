@@ -25,5 +25,5 @@ Georgia Institute of Technology, 2021
 * Peter Addison
 * Mi Do
 * Si Ferrel
-* Tamir Gonen-Cohen
+* Tamir Gonen Cohen
 * Julie Malewicz
