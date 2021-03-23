@@ -9,6 +9,8 @@ Keeping track of the names and versions of the python modules used.
 ```
 numpy
 pandas
+scipy
+matplotlib
 ...
 ```
 
