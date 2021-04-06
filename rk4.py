@@ -1,5 +1,5 @@
 #inputs: initial x position [SI units], initial y position [SI units], lens mass [in solar mass units]
-def photon_orbit5(x_init, y_init, lens_mass = 1e3, N = 1000): 
+def rk4(x_init, y_init, lens_mass = 1e3, N = 1000): 
     
     ##! Import root finding method to solve for the turning point.
     ##! TODO: implement root finding by hand?
@@ -17,9 +17,20 @@ def photon_orbit5(x_init, y_init, lens_mass = 1e3, N = 1000):
     M = solar_mass*lens_mass # convert lens mass to kg
     R = 2*G*M/(c**2) # Schwarzschild Radius, to be used as as length normalization
     
+    ##! In the 'inbound' portion of the trajectory, r must decrease, therefore
+    ##! dr/dphi must be negative (phi is always increasing). However, once the particle passes the turning point
+    ##! r1 (closest approach), r must INCREASE, therefore dr/dphi becomes positive.
+    ##! To model this, the sign of dr/dphi is initially set to -1. Once the distance
+    ##! r is within a certain distance from the turning point distance, the sign is changed
+    ##! to +1 to reflect the outbound orbit. This tolerance must be finite, as at r1 itself,
+    ##! the equation for dr/dphi diverges. The result is that the orbit "jumps" over the turning
+    ##! point. Epsilon is the tolerance, i.e., the difference between r and r1 at which
+    ##! point the code knows to 'jump' past the turning point, and reverse the sign of dr/dphi
+    epsilon = 0.01*R 
+    
     ##! initialize photon locations, in both cartesian and polar coodinates
     x0 = np.array([x_init])
-    y0 = np.array([y_init])
+    y0 = np.array([abs(y_init)])
     r0 = np.sqrt(x0**2 + y0**2)
     phi_0 = np.arctan2(y0,x0)
     
@@ -35,8 +46,7 @@ def photon_orbit5(x_init, y_init, lens_mass = 1e3, N = 1000):
     ##! the photon will be captured by the mass. In this case
     ##! the function returns the string 'Captured'
     if b**2 < 27*(R/2)**2:
-        print('Captured')
-        return 'Captured'
+        return -1, -1
     
     ##! Function to determine the turning point r1.
     ##! Finding the root of this function returns the 
@@ -54,45 +64,49 @@ def photon_orbit5(x_init, y_init, lens_mass = 1e3, N = 1000):
     ##! WHAT 
     r1 = brentq(turning_point, 2*R, b)
     
-    ##! Define the step size in r (radial distance), as the distance 
-    ##! from the turning point (r1) to the initial location (r0),
+    ##! Define the step size in phi (azimuthal angle), as the difference
+    ##! between the initial angle phi_0 and 2*pi,
     ##! divided by the number of steps N
-    dr = (r0-r1)/N
+    dphi = (2*np.pi-phi_0)/N
     
-    ##! Create an array of r values that range from r1 to r0 with step dr
-    r = np.arange(r1,r0,dr)
+    ##! Set the sign of the derivative to negative initially, reflecting
+    ##! the inbound portion of the trajectory
+    sign = -1
     
-    ##! Initialize an array to hold the values of phi calculated for each respective r
-    ##! via the ODE solver
-    phi = np.zeros(len(r))
+    ##! Create an array of r values that range from phi_0 to 2*pi with step dphi
+    phi = np.arange(phi_0,2*np.pi,dphi)
+
     
-    ##! Initialize the first location as the turning point, with distance r1,
-    ##! and angle (by definition) of pi/2.
-    ##! RIGHT NOW THE SOLVER TRACKS THE PARTICLE OUTWARD, FROM THE 
-    ##! TURNING POINT TO THE INITIAL POINT.
-    ##! TODO: REVERSE THIS, SO THAT IT TRACKS THE PARTICLE INWARD.
-    ##! THIS WILL ALLOW EASIER TRANSLATION OF THE COORDINATE SYSTEM,
-    ##! AS UNDER THE CURRENT FRAMEWORK THE Y AXIS IS DEFINED AS THE 
-    ##! AXIS THAT INTERSECTS THE TURNING POINT (phi = pi/2)
-    r[0] = r1
-    phi[0] = np.pi/2
+    ##! Initialize an array to hold the values of r calculated for each respective phi
+    ##! via the ODE solver. Make the first value the initial value r0
+    r = np.array([r0])
     
-    ##! Define the ODE for phi(r), in terms of the effective potential weff.
+    ##! Define the ODE for r(phi), in terms of the effective potential weff.
     ##! Input: radial distance, in SI units
     def f(r):
         weff = (1-R/r)/(r**2)
-        return (1/(b**2) - weff)**(-1/2)*(1/(r**2))
+        return 1/(sign*(1/(b**2) - weff)**(-1/2)*(1/(r**2)))
     
     ##! RK4 SOLVER
-    ##! Calculate the respective angle phi for the given value of r.
-    ##! Again, this only calculates from the turning point r1 to the 
-    ##! initial point r0
+    ##! Calculate the respective distance r for the given value of phi.
+    ##! If the particle exceeds the initial distance r0, terminate
+    ##! the calculation. Later, this condition will be replaced with
+    ##! the detector location. 
+    ##! If the particle is within epsilon distance of the turning
+    ##! point, jump over the turning point and change the sign of 
+    ##! dr/dphi
     for i in range(1,len(phi)):
-        k1 = dr*f(r[i-1]+ dr)
-        k2 = dr*f(r[i-1]+ 0.5*dr)
-        k3 = dr*f(r[i-1]+ 0.5*dr)
-        k4 = dr*f(r[i-1]+ dr)
-        phi[i] = phi[i-1]+(1/6)*(k1+2*k2+2*k3+k4)
+        k1 = dphi*f(r[i-1])
+        k2 = dphi*f(r[i-1] + 0.5*k1)
+        k3 = dphi*f(r[i-1] + 0.5*k2)
+        k4 = dphi*f(r[i-1] + k3)
+        new_r = r[i-1]+(1/6)*(k1+2*k2+2*k3+k4)
+        r = np.append(r, new_r)
+        if np.linalg.norm(r[i]) > r0:
+            phi = phi[0:len(r)]
+            break
+        elif np.linalg.norm(r[i]) - r1 < epsilon:
+            sign = 1
         
     ##! Convert the output from polar to cartesian coordinates.
     ##! Y axis: Axis connecting the lens location to the turning point.
@@ -101,50 +115,20 @@ def photon_orbit5(x_init, y_init, lens_mass = 1e3, N = 1000):
     ##! photon trajectory (Conservation of angular momentum requires
     ##! that the photon trajectory be confined to a plane containing 
     ##! the lens.)
+    
     x = r*np.cos(phi)
     y = r*np.sin(phi)
     
-    ##! Initialize axes for trajectory plot.
-    fig, ax = plt.subplots(1,1, figsize = (10,8))
+    ##! Particles that have an initial y position y_init that is negative are simply
+    ##! flipped, treated as if the y_init was positive, and then flipped back. This 
+    ##! avoids having to redefine the angle phi, which would change the treatment of the
+    ##! sign of the derivative. 
+    if y_init < 0:
+        y = -1*y
     
-    ##! Plot trajectory from origin to turning point. Map radial
-    ##! distance into a colormap defining the color of each point.
-    fig1 = ax.scatter(x/R,y/R, c = r/R, cmap = 'jet', s = 10)
-    ##! Plot the trajectory "mirrored" around the turning point.
-    ##! Both origin->turning point and turning point-> exit trajectories
-    ##! should be symmetric around the turning point.
-    fig2 = ax.scatter(-x/R, y/R, c = r/R, cmap = 'jet', s = 10)
-    
-    eh_theta = np.linspace(0,2*np.pi,1000)
-    eh_x = R*np.cos(eh_theta)
-    eh_y = R*np.sin(eh_theta)
-    
-    capture_theta = np.linspace(0,2*np.pi,1000)
-    capture_x = (3/2)*np.sqrt(3)*R*np.cos(eh_theta)
-    capture_y = (3/2)*np.sqrt(3)*R*np.sin(eh_theta)
-    
-    ##! Draw the event horizon (circle radius R, black)
-    ax.plot(eh_x/R,eh_y/R, color = 'k')
-    
-    ##! Draw the "capture radius" (circle radius sqrt(27/4)*R, orange)
-    ax.plot(capture_x/R,capture_y/R, color = 'tab:orange')
-    
-    ##! Draw the axes
-    ax.axvline(0, linestyle = 'dashed')
-    ax.axhline(0, linestyle = 'dashed')
-    
-    ##! Set the axes limits
-    ##! TODO: Generalize this
-    ax.set_xlim(-x0/R, x0/R)
-    ax.set_ylim(-x0/R, x0/R)
-    
-    ##! Set colorbar and respective labels
-    c1 = plt.colorbar(fig1, ax = ax)
-    c1.set_label('Distance r [R$_S$]')
-    ax.set_xlabel('X ($R_S$)', fontsize = 20)
-    ax.set_ylabel('Y ($R_S$)', fontsize = 20)
-    ax.set_title('Impact Parameter = %s R' % (b/R))
-    
-    plt.tight_layout()
-    
-    return r, phi
+    ##! Return the array of x and y coordinates. For efficiency, this will eventually
+    ##! be replaced with returning only the final coordinates x[-1] and y[-1].
+    ##! STILL NEED TO ADD THE THRID DIMENSION Z TO THIS. Plan to do this by rotating
+    ##! each plane into the xy plane, modeling, and then rotating back, and calculating the 
+    ##! final (x,y,z) position from that.
+    return x, y 
