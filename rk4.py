@@ -1,12 +1,9 @@
 #inputs: initial x position [SI units], initial y position [SI units], lens mass [in solar mass units]
-def rk4(x_init, y_init, lens_mass = 1e3, N = 1000): 
+def photon_orbit11(x_init, y_init, lens_mass = 1e3, N = 1000, detector_loc = -75): 
     
     ##! Import root finding method to solve for the turning point.
     ##! TODO: implement root finding by hand?
     from scipy.optimize import brentq 
-    
-    ##! Set font size for plots
-    plt.rcParams.update({'font.size': 22})
     
     ##! Define necessary physical constants
     G = constants.G
@@ -16,6 +13,8 @@ def rk4(x_init, y_init, lens_mass = 1e3, N = 1000):
     ##! Lens Properties
     M = solar_mass*lens_mass # convert lens mass to kg
     R = 2*G*M/(c**2) # Schwarzschild Radius, to be used as as length normalization
+    
+    detector_location = detector_loc*R
     
     ##! In the 'inbound' portion of the trajectory, r must decrease, therefore
     ##! dr/dphi must be negative (phi is always increasing). However, once the particle passes the turning point
@@ -102,7 +101,7 @@ def rk4(x_init, y_init, lens_mass = 1e3, N = 1000):
         k4 = dphi*f(r[i-1] + k3)
         new_r = r[i-1]+(1/6)*(k1+2*k2+2*k3+k4)
         r = np.append(r, new_r)
-        if np.linalg.norm(r[i]) > r0:
+        if np.linalg.norm(r[i])*np.cos(phi[i]) < detector_location:
             phi = phi[0:len(r)]
             break
         elif np.linalg.norm(r[i]) - r1 < epsilon:
@@ -119,6 +118,20 @@ def rk4(x_init, y_init, lens_mass = 1e3, N = 1000):
     x = r*np.cos(phi)
     y = r*np.sin(phi)
     
+    ##! We now need to backtrace, and calculate the y value exactly when the 
+    ##! particle crossed the detector
+    
+    y2, y1 = y[-1], y[-2]
+    x2, x1 = x[-1], x[-2]
+    
+    m = (y2-y1)/(x2-x1)
+    
+    y_detector = m*detector_location + y2-m*x2
+    
+    x[-1] = detector_location
+    y[-1] = y_detector
+    
+    
     ##! Particles that have an initial y position y_init that is negative are simply
     ##! flipped, treated as if the y_init was positive, and then flipped back. This 
     ##! avoids having to redefine the angle phi, which would change the treatment of the
@@ -131,4 +144,4 @@ def rk4(x_init, y_init, lens_mass = 1e3, N = 1000):
     ##! STILL NEED TO ADD THE THRID DIMENSION Z TO THIS. Plan to do this by rotating
     ##! each plane into the xy plane, modeling, and then rotating back, and calculating the 
     ##! final (x,y,z) position from that.
-    return x, y 
+    return x[-1],y[-1] 
