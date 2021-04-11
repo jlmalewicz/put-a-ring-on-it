@@ -6,20 +6,25 @@ $$\Delta\phi=2\int_{0}^{1}\frac{dz}{\left[z+r_1(1-z)\right]^2}\left(\frac{1}{b^2
 from gaussxw import gaussxwab
 from scipy import constants
 
-b = 
-M = 
+b =  
 r1 = 
 
-def h(z):
-    return 2/((z+r1*(1-z))**2) * (1/b**2 - 1/((z/(1-z)+r1)**2) + (2*M)/((z/(1-z)+r1)**3))**(-1/2)
-  
-# calculate integral using  the routines in the file gaussxb.py on Canvas
+G = constants.G
+c = constants.c
+solar_mass = 1.98847e30
+M = solar_mass*1e3 
+R = 2*G*M/(c**2)
+
+def h(z,r1,b):
+    de = z/(1-z)+r1
+    return 2/((z+r1*(1-z))**2) * (1/(b**2) - 1/(de**2) + (2*M)/(de**3))**(-1/2)
+        
 lower_lim = 0
 up_lim = 1
     
-x1, w1 = gaussxwab(50,lower_lim,up_lim)
+x1, w1 = gaussxwab(1000,lower_lim,up_lim)
 integral = 0
 
-for l in range(50):
-    integral += w1[l]*h(x1[l])
-print(integral)
+for l in range(1000):
+    integral += w1[l]*h(x1[l],r1,b)
+integral
