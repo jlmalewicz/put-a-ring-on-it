@@ -1,5 +1,5 @@
 #inputs: initial x position [SI units], initial y position [SI units], lens mass [in solar mass units]
-def photon_orbit11(x_init, y_init, lens_mass = 1e3, N = 1000, detector_loc = -75): 
+def rk4(x_init, y_init, z_init, lens_mass = 1e3, N = 1000, detector_loc = -75): 
     
     ##! Import root finding method to solve for the turning point.
     ##! TODO: implement root finding by hand?
@@ -27,9 +27,16 @@ def photon_orbit11(x_init, y_init, lens_mass = 1e3, N = 1000, detector_loc = -75
     ##! point the code knows to 'jump' past the turning point, and reverse the sign of dr/dphi
     epsilon = 0.01*R 
     
+    ##! Transform input coordinates (unprimed system) into planar (primed) coordinates
+    
+    delta = np.arctan2(z_init,y_init)
+    
+    x0_prime = x_init
+    y0_prime = np.linalg.norm([y_init, z_init])
+    
     ##! initialize photon locations, in both cartesian and polar coodinates
-    x0 = np.array([x_init])
-    y0 = np.array([abs(y_init)])
+    x0 = np.array([x0_prime])
+    y0 = np.array([y0_prime])
     r0 = np.sqrt(x0**2 + y0**2)
     phi_0 = np.arctan2(y0,x0)
     
@@ -131,17 +138,25 @@ def photon_orbit11(x_init, y_init, lens_mass = 1e3, N = 1000, detector_loc = -75
     x[-1] = detector_location
     y[-1] = y_detector
     
+    ##! now we must convert the final coordinate, y_detector
+    ##! which is in the primed system, back into the unprimed system
+    
     
     ##! Particles that have an initial y position y_init that is negative are simply
     ##! flipped, treated as if the y_init was positive, and then flipped back. This 
     ##! avoids having to redefine the angle phi, which would change the treatment of the
     ##! sign of the derivative. 
-    if y_init < 0:
-        y = -1*y
+    #if y_init < 0:
+    #    y = -1*y
+    
+    ##! now we must convert the final coordinate, y_detector
+    ##! which is in the primed system, back into the unprimed system
+    y_out = y[-1]*np.cos(delta)
+    z_out = y[-1]*np.sin(delta)
     
     ##! Return the array of x and y coordinates. For efficiency, this will eventually
     ##! be replaced with returning only the final coordinates x[-1] and y[-1].
     ##! STILL NEED TO ADD THE THRID DIMENSION Z TO THIS. Plan to do this by rotating
     ##! each plane into the xy plane, modeling, and then rotating back, and calculating the 
     ##! final (x,y,z) position from that.
-    return x[-1],y[-1] 
+    return y_out, z_out
