@@ -7,11 +7,7 @@
 
 Keeping track of the names and versions of the python modules used.
 ```
-numpy
-pandas
-scipy
-matplotlib
-...
+argparse, scipy, numpy, matplotlib, PIL, gaussxw
 ```
 
 ### Installing
@@ -20,13 +16,17 @@ matplotlib
 
 `initialize_photons.py` takes in an image / object and converts it into a numpy array for processing
 
-`initialize_lens.py` sets up the point mass(es) that will act as gravitational lens
+`rk4.py` contains the rk4 solver module we can call
 
-`gen_relativity.py` contains modules we can call, with set values for G, c and conversion between different coordinate systems
+`integral.py` contains the integral solver module we can call
+
+`helmholtz.py` can be called from the command line to produce images of a Gaussian object transiting behind a lens of chosen mass, using Helmholtz regression
+`python helmholtz.py -s rk4 -l 1e3 --savefile` uses rk4 to output and save (`--savefile` is an optional argument) images, created with lens mass `-l` = 1e3 solar masses.
 
 ## Licensing
 
 Georgia Institute of Technology, 2021
+Computational Physics 6260
 
 ## Authors
 
